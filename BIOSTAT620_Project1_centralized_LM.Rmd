@@ -1,0 +1,159 @@
+---
+title: "BIOSTAT620_project1_oracular_regression"
+author: "Ruoer Bei"
+date: "2024-02-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(readxl)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+
+ST_all_oracular <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/Project_1/total_data.xlsx")
+ST_all_oracular
+
+```
+
+```{r}
+ST_all_oracular2 <- ST_all_oracular %>%
+  mutate(Date = ymd(Date), 
+         SpecialDay = ifelse(Date %in% as.Date(c("2024-02-06", "2024-02-12", "2024-01-25", 
+                                                 "2024-02-01", "2024-02-08", "2024-02-15")), "1", "0"))
+ST_all_oracular2
+```
+
+```{r}
+model_oracular <- lm(proportional ~ Total.ST.min+Pickups+ SpecialDay, data = ST_all_oracular2)
+summary(model_oracular)
+```
+```{r}
+plot(model_oracular, which = 1)
+
+```
+
+
+
+```{r}
+# Q-Q plot
+plot(model_oracular, which = 2)
+
+```
+
+```{r}
+library(lmtest)
+dwtest(model_oracular)
+shapiro.test(residuals(model_oracular))
+
+```
+
+
+
+```{r}
+
+# Calculate the confidence intervals for the coefficients
+conf_intervals <- confint(model_oracular)
+
+# Print the confidence intervals for Total.ST.min, Pickups, and SpecialDay
+conf_intervals[c("Total.ST.min", "Pickups", "SpecialDay1"), ]
+
+```
+
+
+```{r}
+
+mean_ST <- mean(ST_all_oracular2$Total.ST.min, na.rm = TRUE)
+mean_ST
+
+```
+
+```{r}
+mean_pick <- mean(ST_all_oracular2$Pickups, na.rm = TRUE)
+mean_pick
+```
+```{r}
+
+mean_social <- mean(ST_all_oracular2$Social.ST.min, na.rm = TRUE)
+mean_social
+
+```
+
+
+```{r}
+# Function to convert time string to minutes past midnight
+convert_to_minutes <- function(time_str) {
+    parts <- unlist(strsplit(time_str, ":"))
+    hours <- as.numeric(parts[1])
+    minutes <- as.numeric(parts[2])
+    total_minutes <- hours * 60 + minutes
+    return(total_minutes)
+}
+
+# Example usage
+time_string <- "08:04:00"
+converted_time <- convert_to_minutes(time_string)
+
+converted_time
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+
+# Filter data for IDs 1, 2, and 3
+data_filtered <- filter(ST_all_oracular2, ID %in% c(1, 2, 3))
+
+# Plot all three IDs in one graph
+ggplot(data_filtered, aes(x = Date, y = proportional, color = as.factor(ID))) +
+  geom_line() +
+  ggtitle("Time Series of Proportional for IDs 1, 2, and 3") +
+  xlab("Date") +
+  ylab("Proportional") +
+  scale_color_manual(values = c("red", "blue", "green")) +
+  theme_minimal()
+
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+# Assuming ST_all_oracular2 is already loaded and mutated as per your previous code
+
+# Filter data for IDs 1, 2, and 3
+data_filtered <- filter(ST_all_oracular2, ID %in% c(1, 2, 3))
+
+# Define special dates
+special_dates <- as.Date(c("2024-02-06", "2024-02-12", "2024-01-25", 
+                           "2024-02-01", "2024-02-08", "2024-02-15"))
+
+# Plot all three IDs in one graph with special dates indicated by red points
+ggplot(data_filtered, aes(x = Date, y = proportional, color = as.factor(ID))) +
+  geom_line() +
+  scale_color_manual(values = c("red", "blue", "green")) +
+  ggtitle("Time Series of Proportional Screen Time for Three Participants") +
+  xlab("Date") +
+  ylab("Proportion between Social Screen Time and Total Screen Time") +
+  geom_point(data = filter(data_filtered, Date %in% special_dates), 
+             aes(x = Date, y = proportional), color = "red", size = 3) +
+  theme_minimal()
+
+
+```
+```{r}
+acf(ST_all_oracular2$proportional, lag.max = 30)
+```
+
