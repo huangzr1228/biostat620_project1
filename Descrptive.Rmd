@@ -1,0 +1,125 @@
+---
+title: "Descriptive Analysis"
+author: "Mimi Li"
+date: "2024-02-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("lubridate")
+#install.packages(("GGally"))
+#install.packages(("circular"))
+#install.packages("reshape2")
+library(readxl)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library("GGally")
+library(circular)
+library(reshape2)
+```
+
+# Data Preparation
+
+```{r}
+data = read_excel(path = "/Users/mimi/Desktop/school/Umich/year 1/Winter/Biostat 620/total_data 1.xlsx")
+
+# Change datatype of Date
+data <- data %>%
+  mutate(Date = as.Date(Date))
+
+# Function to extract the time component from 'Pickup.1st'
+extract_time <- function(x) {
+  time_part <- strsplit(as.character(x), split = " ")[[1]][2]
+  return(time_part)
+}
+
+data <- data %>%
+  mutate(Pickup.1st = sapply(Pickup.1st, extract_time))
+
+data <- data %>%
+  mutate(`Pickup.1st` = as.POSIXct(paste(as.character(Date), `Pickup.1st`), format="%Y-%m-%d %H:%M:%S"))
+```
+
+# Data Summary
+
+## Average data per day
+```{r}
+# Calculate average per day
+avg_total <- aggregate(Total.ST.min ~ Date, data = data, FUN = mean)
+
+avg_social <- aggregate(Social.ST.min ~ Date, data = data, FUN = mean)
+
+avg_duration <- aggregate(duration ~ Date, data = data, FUN = mean)
+
+avg_pickups <- aggregate(Pickups ~ Date, data = data, FUN = mean)
+
+avg_proportion <- aggregate(proportional ~ Date, data = data, FUN = mean)
+
+
+# Merge into one dataframe
+avg_data <- Reduce(function(x, y) merge(x, y, by = "Date", all = TRUE), 
+                   list(avg_total, avg_social, avg_duration, avg_pickups, avg_proportion))
+
+names(avg_data)[2:6] <- c("AvgScreenTime", "AvgSocialTime", "AvgDuration", "AvgPickups", "AvgProportion")
+```
+
+## Heatmap
+```{r}
+melted_data <- melt(avg_data, id.vars = "Date")
+
+# Normalize the values within each variable
+melted_data <- melted_data %>%
+  group_by(variable) %>%
+  mutate(value = scales::rescale(value, to = c(0, 1))) %>%
+  ungroup()
+
+# Dates with assignment
+highlight_dates <- as.Date(c("2024-01-25", "2024-02-01", "2024-02-06", "2024-02-08", "2024-02-12"))
+
+# Plot
+ggplot(melted_data, aes(x = Date, y = variable, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "yellow", high = "red", name = "Normalized Value") +
+  labs(x = "Date", y = "", title = "Daily Average Metrics (Normalized)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_blank(),
+        panel.spacing = unit(1, "lines"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  geom_vline(xintercept = as.numeric(highlight_dates), linetype = "dashed", size = 0.25)
+```
+## Time series plot
+```{r}
+avg_proportion$Highlight <- ifelse(avg_proportion$Date %in% highlight_dates, "Highlight", "Regular")
+
+total_pu_plot <- ggplot(avg_proportion, aes(x = Date, y = proportional, group = 1)) +
+  geom_line(color = "#999999") +
+  geom_point(aes(color = Highlight)) +
+  labs(x = "Dates", y = "Avg social screen time proportion") +
+  scale_color_manual(values = c("Regular" = "#999999",
+                                "Highlight" = "#FF99CC")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),
+        legend.title = element_blank(),
+        legend.position = "none")
+
+# Print the plot
+total_pu_plot
+```
+## ACF Plot
+```{r}
+acf(avg_proportion$proportional, lag.max = 31)
+```
+
+## Pairwise Plot
+```{r}
+melted_data
+ggpairs(avg_data, columns = c("AvgScreenTime", "AvgPickups"),
+        columnLabels = c("AvgScreenTime", "AvgPickups")) + theme_bw()
+```

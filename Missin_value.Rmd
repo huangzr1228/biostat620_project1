@@ -1,0 +1,128 @@
+---
+title: "Missing Value"
+author: "Mimi Li"
+date: "2024-02-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("lubridate")
+#install.packages(("GGally"))
+#install.packages(("circular"))
+library(readxl)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library("GGally")
+library(circular)
+```
+# Data Preparation
+
+## Variables
+```{r}
+data = read_excel(path = "/Users/mimi/Desktop/school/Umich/year 1/Winter/Biostat 620/ST_Mimi.xlsx")
+
+# Change datatype of Date
+data <- data %>%
+  mutate(Date = as.Date(Date))
+
+# Function to extract the time component from 'Pickup.1st'
+extract_time <- function(x) {
+  time_part <- strsplit(as.character(x), split = " ")[[1]][2]
+  return(time_part)
+}
+
+data <- data %>%
+  mutate(Pickup.1st = sapply(Pickup.1st, extract_time))
+
+data <- data %>%
+  mutate(`Pickup.1st` = as.POSIXct(paste(as.character(Date), `Pickup.1st`), format="%Y-%m-%d %H:%M:%S"))
+
+# Convert time strings to minutes
+convert_min <- function(time) {
+  split_hr_min <- strsplit(time, "h|m")[[1]]
+  hours <- as.numeric(split_hr_min[1])
+  minutes <- as.numeric(split_hr_min[2])
+  return(hours * 60 + minutes)
+}
+
+# Convert Total.ST and Social.ST
+data <- data %>%
+  mutate(Total.ST.min = sapply(Total.ST, convert_min))
+
+data <- data %>%
+  mutate(Social.ST.min = sapply(Social.ST, convert_min))
+
+# Create the two new variables
+data <- data %>%
+  mutate(Daily.prop.social = Social.ST.min / Total.ST.min)
+
+data <- data %>%
+  mutate(Daily.duration = Total.ST.min / Pickups)
+
+# Check if the date is a weekend
+data$if_weekend <- ifelse(weekdays(data$Date) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+
+# Create 
+data = data %>%
+  mutate(Pickup.1st.agl = (hour(Pickup.1st) * 60 + minute(Pickup.1st)) / (24 * 60) * 360)
+```
+
+## Missing data
+```{r}
+data = data %>%
+  mutate(Pickup.1st.agl = (hour(Pickup.1st) * 60 + minute(Pickup.1st)) / (24 * 60) * 360)
+
+```
+
+```{r}
+# Extract rows where day_type is 'Weekday'
+weekday_data <- data[data$if_weekend == 'weekday', ]
+weekend_data <- data[data$if_weekend == 'weekend', ]
+
+# Calculate mean value of 'social proportion'
+mean_proportion_weekday <- mean(weekday_data$Daily.prop.social, na.rm = TRUE)
+mean_proportion_weekend <- mean(weekend_data$Daily.prop.social, na.rm = TRUE)
+
+# Calculate mean value of social ST
+mean_social_weekday <- mean(weekday_data$Social.ST.min, na.rm = TRUE)
+mean_social_weekend <- mean(weekend_data$Social.ST.min, na.rm = TRUE)
+
+# Calculate mean value of total ST
+mean_total_weekday <- mean(weekday_data$Total.ST.min, na.rm = TRUE)
+mean_total_weekend <- mean(weekend_data$Total.ST.min, na.rm = TRUE)
+
+# Calculate mean value of 1st pickups
+mean_1stpick_weekday <- mean(weekday_data$Pickup.1st.agl, na.rm = TRUE)
+mean_1stpick_weekend <- mean(weekend_data$Pickup.1st.agl, na.rm = TRUE)
+
+# Calculate mean value of total pickups
+mean_total_pic_weekday <- mean(weekday_data$Pickups, na.rm = TRUE)
+mean_total_pic_weekend <- mean(weekend_data$Pickups, na.rm = TRUE)
+
+# Calculate mean value of daily duration
+mean_duration_weekday <- mean(weekday_data$Daily.duration, na.rm = TRUE)
+mean_duration_weekend <- mean(weekend_data$Daily.duration, na.rm = TRUE)
+```
+
+```{r}
+data <- data %>%
+  mutate(
+    Daily.prop.social = ifelse(is.na(Daily.prop.social) & if_weekend == 'weekday', mean_proportion_weekday, 
+                               ifelse(is.na(Daily.prop.social) & if_weekend == 'weekend', mean_proportion_weekend, Daily.prop.social)),
+    Social.ST.min = ifelse(is.na(Social.ST.min) & if_weekend == 'weekday', mean_social_weekday, 
+                           ifelse(is.na(Social.ST.min) & if_weekend == 'weekend', mean_social_weekend, Social.ST.min)),
+    Total.ST.min = ifelse(is.na(Total.ST.min) & if_weekend == 'weekday', mean_total_weekday, 
+                          ifelse(is.na(Total.ST.min) & if_weekend == 'weekend', mean_total_weekend, Total.ST.min)),
+    Pickup.1st.agl = ifelse(is.na(Pickup.1st.agl) & if_weekend == 'weekday', mean_1stpick_weekday, 
+                            ifelse(is.na(Pickup.1st.agl) & if_weekend == 'weekend', mean_1stpick_weekend, Pickup.1st.agl)),
+    Pickups = ifelse(is.na(Pickups) & if_weekend == 'weekday', mean_total_pic_weekday, 
+                     ifelse(is.na(Pickups) & if_weekend == 'weekend', mean_total_pic_weekend, Pickups)),
+    Daily.duration = ifelse(is.na(Daily.duration) & if_weekend == 'weekday', mean_duration_weekday, 
+                          ifelse(is.na(Daily.duration) & if_weekend == 'weekend', mean_duration_weekend, Daily.duration)),
+  )
+```
