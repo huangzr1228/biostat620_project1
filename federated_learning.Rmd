@@ -1,0 +1,94 @@
+---
+title: "federated_learning"
+output: html_document
+date: "2024-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data1_SSX_SSXY <- read.csv("data1_SSX_SSXY.csv")
+data2_SSX_SSXY <- read.csv("data2_SSX_SSXY.csv")
+data3_SSX_SSXY <- read.csv("data3_SSX_SSXY.csv")
+data1_SSY_N <- read.csv("data1_SSY_N.csv")
+data2_SSY_N <- read.csv("data2_SSY_N.csv")
+data3_SSY_N <- read.csv("data3_SSY_N.csv")
+```
+
+```{r}
+# extract the SSX, SSXY, SSY, SSR and SST
+SSX_1 <- as.matrix(data1_SSX_SSXY[, 1:(ncol(data1_SSX_SSXY) - 1)])
+SSXY_1 <- as.matrix(data1_SSX_SSXY[, ncol(data1_SSX_SSXY)])
+SSY_1 <- as.matrix(data1_SSY_N[,1])
+
+SSX_2 <- as.matrix(data2_SSX_SSXY[, 1:(ncol(data2_SSX_SSXY) - 1)])
+SSXY_2 <- as.matrix(data2_SSX_SSXY[, ncol(data2_SSX_SSXY)])
+SSY_2 <- as.matrix(data2_SSY_N[,1])
+
+SSX_3 <- as.matrix(data3_SSX_SSXY[, 1:(ncol(data3_SSX_SSXY) - 1)])
+SSXY_3 <- as.matrix(data3_SSX_SSXY[, ncol(data3_SSX_SSXY)])
+SSY_3 <- as.matrix(data3_SSY_N[,1])
+```
+
+```{r}
+# combination
+SSX_total <- SSX_1 + SSX_2 + SSX_3
+SSXY_total <- SSXY_1 + SSXY_2 + SSXY_3
+SSY_total <- SSY_1 + SSY_2 + SSY_3
+SSR_total <- SSR_1 + SSR_2 + SSR_3
+SST_total <- SST_1 + SST_2 + SST_3
+
+# beta hat
+beta_hat <- as.vector(solve(SSX_total) %*% SSXY_total)
+beta_hat
+```
+
+```{r}
+n1 <- data1_SSY_N$n1
+n2 <- data2_SSY_N$n2
+n3 <- data3_SSY_N$n3
+n <- n1 + n2 + n3 # total sample size
+p <- ncol(data1_SSX_SSXY) - 1 # the number of covariates and intercept
+
+
+sigma_squared_hat <- ((SSY_total - 2 * t(beta_hat) %*% SSXY_total + t(beta_hat) %*% SSX_total %*% beta_hat) 
+                      / (n - p))[1,1]
+
+# standard errors
+std_error_beta_hat <- sqrt(diag(sigma_squared_hat * solve(SSX_total)))
+```
+
+```{r}
+# t statistic
+t_stat <- beta_hat / std_error_beta_hat
+# degrees of fredom
+df <- n - p
+# significance level
+alpha <- 0.05
+critical_value <- qt(alpha / 2, df, lower.tail = FALSE)
+significant <- abs(t_stat) > critical_value
+# p-value
+p_values <- 2 * (1 - pt(abs(t_stat), df))
+
+# Lower and upper bounds of the 95% confidence interval
+ci_lower <- beta_hat - critical_value * std_error_beta_hat
+ci_upper <- beta_hat + critical_value * std_error_beta_hat
+
+results <- data.frame(
+  beta_hat = beta_hat,
+  std_error_beta_hat = std_error_beta_hat,
+  t_stat = t_stat,
+  p_value = p_values,
+  critical_value = critical_value,
+  ci_lower = ci_lower,
+  ci_upper = ci_upper,
+  significant = significant
+)
+
+print(results)
+```
+
+
+
