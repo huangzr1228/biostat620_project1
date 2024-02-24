@@ -1,0 +1,113 @@
+---
+title: "data1"
+output: html_document
+date: "2024-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(MASS)
+```
+
+```{r}
+data1 <- read.csv("Screentime_zr.csv")
+```
+
+```{r}
+# convert hours to minutes
+hour_to_min <- function(time) {
+  unlist(lapply(time, function(x) {splt = strsplit(x, "h")[[1]];
+                                   hr = as.numeric(splt[1]);
+                                   mn = as.numeric(strsplit(splt[2], "m")[[1]][1]);
+                                   return(60*hr + mn)}))
+}
+data1$Total.ST.min <- hour_to_min(data1$Total.ST)
+data1$Social.ST.min <- hour_to_min(data1$Social.ST)
+```
+
+```{r}
+data1 <- data1 %>% 
+  mutate(Date = as.Date(Date))
+
+data1 <- data1 %>%
+  mutate(Proportion.ST = Social.ST.min/Total.ST.min,
+         Duration.per.use = Total.ST.min/Pickups)
+```
+
+```{r}
+# Create the column "Due"
+data1 <- data1 %>%
+  mutate(
+    Due = if_else(Date %in% as.Date(c('2024-01-25', '2024-02-01', '2024-02-08', '2024-02-15', '2024-02-06', '2024-02-12')), 1, 0)
+  )
+```
+
+```{r}
+# OLS
+Y <- as.matrix(data1$Proportion.ST)
+X <- as.matrix(cbind(1, data1$Total.ST.min, data1$Pickups, data1$Due))
+
+n1 <- nrow(data1) # sample size
+SSX_1 <- t(X) %*% X
+SSXY_1 <- t(X) %*% Y
+SSY_1 <- t(Y) %*% Y
+SSX_SSXY1 <- cbind(SSX_1, SSXY_1)
+SSY_N1 <- cbind(SSY_1, n1)
+SSX_SSXY1_df <- as.data.frame(SSX_SSXY1)
+SSY_N1_df <- as.data.frame(SSY_N1)
+
+write.csv(SSX_SSXY1_df, "data1_SSX_SSXY.csv", row.names = FALSE)
+write.csv(SSY1_N1_df, "data1_SSY_N.csv", row.names = FALSE)
+```
+
+```{r}
+# beta_hat
+beta_hat1 <- solve(SSX_1) %*% SSXY_1
+Y_hat <- X %*% beta_hat1
+# SSR
+Y_bar <- mean(Y)
+SSR <- sum((Y_hat - Y_bar) ^ 2)
+# SST
+SST <- sum((Y - Y_bar) ^ 2)
+
+SSR_val <- as.numeric(SSR)
+SST_val <- as.numeric(SST)
+SS_df1 <- data.frame(SSR = SSR_val, SST = SST_val)
+write.csv(SS_df1, "data1_SS.csv", row.names = FALSE)
+```
+
+```{r}
+n <- nrow(data1) + nrow(data2) + nrow(data3)
+p <- ncol(X) 
+
+sigma_squared_hat <- (SSXY_total - 2 * t(beta_hat) %*% SSXY_total + t(beta_hat) %*% SSX_total %*% beta_hat) / (n - p)
+
+# standard errors
+std_error_beta_hat <- sqrt(sigma_squared_hat * diag(solve(SSX1 + SSX2)))
+```
+
+```{r}
+# t-test
+t_stats <- beta_hat / std_error_beta_hat
+alpha <- 0.05
+df <- n - p
+critical_t <- qt(alpha/2, df, lower.tail = FALSE)
+significant <- abs(t_stats) > critical_t
+
+results <- data.frame(
+  Estimate = beta_hat,
+  StdError = std_error_beta_hat,
+  tValue = t_stats,
+  pValue = 2 * (1 - pt(abs(t_stats), df)),
+  Significant = significant
+)
+
+print(results)
+```
+
+
