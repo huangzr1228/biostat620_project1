@@ -1,0 +1,61 @@
+---
+title: "data2"
+output: html_document
+date: "2024-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data2 <- read.csv("screentime_b.csv")
+```
+
+```{r}
+str(data2)
+```
+```{r}
+data2 <- data2 %>% 
+  mutate(Date = as.Date(Date))
+
+# Create the column "Due"
+data2 <- data2 %>%
+  mutate(
+    Due = if_else(Date %in% as.Date(c('2024-01-25', '2024-02-01', '2024-02-08', '2024-02-15', '2024-02-06', '2024-02-12')), 1, 0)
+  )
+```
+
+```{r}
+# OLS
+Y <- as.matrix(data2$Proportion.ST)
+X <- as.matrix(cbind(1, data2$Total.ST.min, data2$Pickups, data2$Due))
+n2 <- nrow(data2) # sample size
+SSX_2 <- t(X) %*% X
+SSXY_2 <- t(X) %*% Y
+SSY_2 <- t(Y) %*% Y
+SSX_SSXY2 <- cbind(SSX_2, SSXY_2)
+SSY_N2 <- cbind(SSY_2, n2)
+SSX_SSXY2_df <- as.data.frame(SSX_SSXY2)
+SSY_N2_df <- as.data.frame(SSY_N2)
+
+write.csv(SSX_SSXY2_df, "data2_SSX_SSXY.csv", row.names = FALSE)
+write.csv(SSY_N2_df, "data2_SSY_N.csv", row.names = FALSE)
+```
+
+```{r}
+# beta_hat
+beta_hat2 <- solve(SSX_2) %*% SSXY_2
+Y_hat <- X %*% beta_hat2
+# SSR
+Y_bar <- mean(Y)
+SSR <- sum((Y_hat - Y_bar) ^ 2)
+# SST
+SST <- sum((Y - Y_bar) ^ 2)
+
+SSR_val <- as.numeric(SSR)
+SST_val <- as.numeric(SST)
+SS_df2 <- data.frame(SSR = SSR_val, SST = SST_val)
+write.csv(SS_df2, "data2_SS.csv", row.names = FALSE)
+```
+
