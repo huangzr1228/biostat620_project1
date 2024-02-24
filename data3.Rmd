@@ -1,0 +1,61 @@
+---
+title: "data3"
+output: html_document
+date: "2024-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data3 <- read.csv("data_wo_miss.csv")
+str(data3)
+```
+
+```{r}
+data3 <- data3 %>% 
+  mutate(Date = as.Date(Date))
+
+# Create the column "Due"
+data3 <- data3 %>%
+  mutate(
+    Due = if_else(Date %in% as.Date(c('2024-01-25', '2024-02-01', '2024-02-08', '2024-02-15', '2024-02-06', '2024-02-12')), 1, 0)
+  )
+data3
+```
+
+```{r}
+# OLS
+Y <- as.matrix(data3$Daily.prop.social)
+X <- as.matrix(cbind(1, data3$Total.ST.min, data3$Pickups, data3$Due))
+
+n3 <- nrow(data3) # sample size
+SSX_3 <- t(X) %*% X
+SSXY_3 <- t(X) %*% Y
+SSY_3 <- t(Y) %*% Y
+SSX_SSXY3 <- cbind(SSX_3, SSXY_3)
+SSY_N3 <- cbind(SSY_3, n3)
+SSX_SSXY3_df <- as.data.frame(SSX_SSXY3)
+SSY_N3_df <- as.data.frame(SSY_N3)
+
+write.csv(SSX_SSXY3_df, "data3_SSX_SSXY.csv", row.names = FALSE)
+write.csv(SSY_N3_df, "data3_SSY_N.csv", row.names = FALSE)
+```
+
+```{r}
+# beta_hat
+beta_hat3 <- solve(SSX_3) %*% SSXY_3
+Y_hat <- X %*% beta_hat3
+# SSR
+Y_bar <- mean(Y)
+SSR <- sum((Y_hat - Y_bar) ^ 2)
+# SST
+SST <- sum((Y - Y_bar) ^ 2)
+
+SSR_val <- as.numeric(SSR)
+SST_val <- as.numeric(SST)
+SS_df3 <- data.frame(SSR = SSR_val, SST = SST_val)
+write.csv(SS_df3, "data3_SS.csv", row.names = FALSE)
+```
+
